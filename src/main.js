@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import {
   makeRockSet,makeGrassAlbedo,
-  makeBladeAtlas,makeBushAtlas,makeWaterNormal,makeFoamTex,makeDepthTexture,
+  makeBladeAtlas,makeBushAtlas,makeFlowerAtlas,makeWaterNormal,makeFoamTex,makeDepthTexture,
 } from './tex.js';
 import {triplanarTerrain} from './mat.js';
 import {buildField,buildTerrain,buildWater,buildRocks,WORLD,MAX_DEPTH,WATER_Y} from './terrain.js';
@@ -32,6 +32,7 @@ const RES=params.has('res')?parseInt(params.get('res')):(quality==='low'?256:qua
 const GRASS=params.has('grass')?parseInt(params.get('grass')):(quality==='low'?14000:quality==='high'?52000:36000);
 const BUSHES=params.has('bushes')?parseInt(params.get('bushes')):(quality==='low'?1800:quality==='high'?11000:7000);
 const ROCKS=params.has('rocks')?parseInt(params.get('rocks')):(quality==='low'?160:quality==='high'?700:460);
+const FLOWERS=params.has('flowers')?parseInt(params.get('flowers')):(quality==='low'?8000:quality==='high'?52000:30000);
 
 const canvas=document.getElementById('view');
 const renderer=new THREE.WebGLRenderer({
@@ -47,7 +48,9 @@ const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(54,1,0.6,9000);
 
 // —— 天空 + 环境光（IBL）——
-const sunDir=new THREE.Vector3(0.38,0.34,0.86).normalize();
+// 太阳放前侧方（飞行朝 -Z）：参考图是顺光画面，太阳在斜前方迎面照亮草地；
+// 原先太阳在正后方，面向相机的崖壁/草地全部背光 → 整面死黑
+const sunDir=new THREE.Vector3(-0.45,0.42,0.82).normalize();
 const sky=buildSky(renderer,{sunDir});
 scene.add(sky.mesh);
 scene.environment=sky.envMap;
@@ -59,7 +62,7 @@ FOG.uFogSunDir.value.copy(sky.sunDir);
 scene.fog=new THREE.FogExp2(0xcfd9dc,0.00062);
 
 // —— 太阳光 ——
-const sun=new THREE.DirectionalLight(0xffeccd,2.6);
+const sun=new THREE.DirectionalLight(0xffeccd,3.2);
 sun.castShadow=true;
 sun.shadow.mapSize.set(2048,2048);
 const SC=150;
@@ -71,8 +74,15 @@ sun.shadow.normalBias=0.55;
 scene.add(sun);
 scene.add(sun.target);
 
-const hemi=new THREE.HemisphereLight(0xbcd6f0,0x4a5a3a,0.30);
+const hemi=new THREE.HemisphereLight(0xbcd6f0,0x4a5a3a,0.60);
 scene.add(hemi);
+
+// —— 相机方向补光（fill）：太阳在前方时，朝相机的地表是背光面，会死黑。
+//    从观察者方向补一盏暖天光，把阴影垫到"灰褐可见"的亮度 ——
+const fill=new THREE.DirectionalLight(0xe8d6c8,0.60);
+fill.position.set(0,120,320);
+scene.add(fill);
+scene.add(fill.target);
 
 // —— 贴图 ——
 // 岩壁三件套（块面/裂缝/遮蔽）一次生成，反照率、法线、AO 全部同源
@@ -80,6 +90,7 @@ const rockSet=makeRockSet(512,14);
 const grassAlbedo=makeGrassAlbedo(512);
 const bladeAtlas=makeBladeAtlas(128);
 const bushAtlas=makeBushAtlas(128);
+const flowerTex=makeFlowerAtlas(64);
 const waterNrm=makeWaterNormal(256);
 const foamTex=makeFoamTex(256);
 // 高度场只求值一次：地形网格 / 水深图 / 撒点 / 飞行碰撞全部复用它
@@ -113,7 +124,7 @@ const rocks=buildRocks(rockMat,field,{count:ROCKS});
 scene.add(rocks.mesh);
 
 // —— 植被 ——
-const veg=buildVegetation({grassTex:bladeAtlas,bushTex:bushAtlas,field,counts:{grass:GRASS,bushes:BUSHES}});
+const veg=buildVegetation({grassTex:bladeAtlas,bushTex:bushAtlas,flowerTex,field,counts:{grass:GRASS,bushes:BUSHES,flowers:FLOWERS}});
 scene.add(veg.group);
 
 // —— 骑手 ——
@@ -213,7 +224,7 @@ requestAnimationFrame(()=>{
 // 给截图工具/调试用
 window.wetPaintReal={
   THREE,scene,camera,renderer,flight,chase,post,veg,terrain,sky,rider,rocks,water,
-  info(){return {res:RES,grass:veg.grassCount,bushes:veg.bushCount,rocks:rocks.count,fps,
+  info(){return {res:RES,grass:veg.grassCount,bushes:veg.bushCount,flowers:veg.flowerCount,rocks:rocks.count,fps,
     draws:renderer.info.render.calls,tris:renderer.info.render.triangles};},
   look(x,y,z,tx,ty,tz){chase.init=true;chase.mode='fixed';chase.pos.set(x,y,z);chase.look.set(tx,ty,tz);},
   free(){chase.mode='chase';chase.init=false;},

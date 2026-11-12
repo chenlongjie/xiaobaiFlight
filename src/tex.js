@@ -86,6 +86,14 @@ export function makeGrassAlbedo(size=512){
     r+=v2*0.10; g+=v2*0.11; b+=v2*0.055;
     // 露土处压成红棕
     r=lerp(r,0.27,soil*0.62); g=lerp(g,0.22,soil*0.62); b=lerp(b,0.145,soil*0.62);
+    // ★ 远景花区：低频噪声划出 ~400m 级粉色植被区，与 veg.js 的实例花衔接——
+    //   中远景地形直接是粉色色块，近景被实例花盖住，观感才"整片花海"而不是撒花。
+    //   频率 0.085：波长 11.7uv > 贴图周期 8uv，tile 内平滑渐变，不会有平铺噪点
+    const flower=fbm2(u*0.085+11.3,v*0.085+3.7,3);
+    const flowerK=clamp((flower-0.30)*3.2,0,1);
+    r=lerp(r,0.55,flowerK*0.85);
+    g=lerp(g,0.36,flowerK*0.70);
+    b=lerp(b,0.46,flowerK*0.90);
     const shade=0.72+fine*0.5;
     const i=(y*size+x)*4;
     img.data[i]=clamp(r*shade,0,1)*255;
@@ -122,8 +130,9 @@ export function makeBladeAtlas(size=128){
     const w=size*(0.026+Math.random()*0.022);
     const lean=(Math.random()-0.5)*size*0.34;
     const g=ctx.createLinearGradient(0,size,0,size-h);
-    const base=`hsl(${72+Math.random()*22},${22+Math.random()*16}%,${24+Math.random()*12}%)`;
-    const tip =`hsl(${66+Math.random()*24},${28+Math.random()*16}%,${40+Math.random()*16}%)`;
+    // 色域对齐参考图：暗部橄榄绿 → 受光草尖黄绿，贴图内就拉开明暗跨度
+    const base=`hsl(${84+Math.random()*18},${40+Math.random()*22}%,${34+Math.random()*14}%)`;
+    const tip =`hsl(${76+Math.random()*18},${55+Math.random()*20}%,${58+Math.random()*20}%)`;
     g.addColorStop(0,base);g.addColorStop(0.55,base);g.addColorStop(1,tip);
     ctx.fillStyle=g;
     ctx.beginPath();
@@ -236,6 +245,66 @@ export function makeDepthTexture(terrainHeight,worldSize,resolution=512,maxDepth
 }
 
 
+// 粉紫花簇图集（带 alpha）：一簇 = 1 朵主花 + 4 朵小花 + 零散花苞。
+// 单实例就出一小片彩色（远看是色块而不只是点），色相 310~350°（偏紫～偏粉）。
+export function makeFlowerAtlas(size=128){
+  const c=canvas(size),ctx=c.getContext('2d');
+  ctx.clearRect(0,0,size,size);
+  const S=size;
+  // 底部土壤/投影：一小片深色底盘，让花簇"种"在地上而不是浮在草面上
+  const shade=ctx.createRadialGradient(S*0.5,S*0.58,0,S*0.5,S*0.58,S*0.5);
+  shade.addColorStop(0,'rgba(42,36,28,0.50)');
+  shade.addColorStop(0.7,'rgba(42,36,28,0.16)');
+  shade.addColorStop(1,'rgba(42,36,28,0)');
+  ctx.fillStyle=shade;
+  ctx.beginPath();ctx.ellipse(S*0.5,S*0.58,S*0.5,S*0.34,0,0,Math.PI*2);ctx.fill();
+  const hue=310+Math.random()*40;
+  // 主花（居中偏上）
+  const mainClump=(cx,cy,r,len,h)=>{
+    const petals=5;
+    for(let i=0;i<petals;i++){
+      const a=i/petals*Math.PI*2;
+      ctx.save();
+      ctx.translate(cx+Math.cos(a)*r*0.45,cy+Math.sin(a)*r*0.45);
+      ctx.rotate(a);
+      const g=ctx.createLinearGradient(0,0,0,-len);
+      g.addColorStop(0,`hsla(${hue},95%,86%,1)`);
+      g.addColorStop(0.65,`hsla(${hue-8},72%,72%,1)`);
+      g.addColorStop(1,`hsla(${hue-14},58%,62%,0)`);
+      ctx.fillStyle=g;
+      ctx.beginPath();
+      ctx.ellipse(0,0,r*0.5,len,0,0,Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+    const core=ctx.createRadialGradient(cx,cy,0,cx,cy,r*0.42);
+    core.addColorStop(0,`hsla(${48},95%,66%,0.95)`);
+    core.addColorStop(1,`hsla(${48},95%,66%,0)`);
+    ctx.fillStyle=core;
+    ctx.beginPath();ctx.arc(cx,cy,r*0.42,0,Math.PI*2);ctx.fill();
+    // 花旁的细小花苞（点），让簇的边缘不齐
+    for(let b=0;b<3;b++){
+      const ba=Math.random()*Math.PI*2,br=r*(0.8+Math.random()*1.6);
+      const bx=cx+Math.cos(ba)*br, by=cy+Math.sin(ba)*br;
+      ctx.fillStyle=`hsla(${hue+8},80%,75%,${0.5+Math.random()*0.4})`;
+      ctx.beginPath();ctx.arc(bx,by,r*(0.12+Math.random()*0.18),0,Math.PI*2);ctx.fill();
+    }
+  };
+  // 一簇：主花在中心偏上，2 大花 + 3 小花散开在周围
+  mainClump(S*0.5,S*0.44,S*0.20,S*0.30);
+  for(let s=0;s<2;s++){
+    mainClump(S*(0.26+Math.random()*0.48),S*(0.22+Math.random()*0.5),S*0.15,S*0.22);
+  }
+  for(let s=0;s<3;s++){
+    mainClump(S*(0.2+Math.random()*0.6),S*(0.3+Math.random()*0.55),S*0.09,S*0.13);
+  }
+  const t=new THREE.CanvasTexture(c);
+  t.colorSpace=THREE.SRGBColorSpace;
+  t.anisotropy=4;
+  t.needsUpdate=true;
+  return t;
+}
+
 // 灌木/叶丛图集（带 alpha）：没有树干，只有一堆叶子团成的球
 // 这是"树太假"的替代方案——不做树，做地被灌木层
 export function makeBushAtlas(size=128){
@@ -303,7 +372,7 @@ export function makeRockSet(size=512){
     const h=H[y*size+x],cr=crease[y*size+x];
     const rust=clamp((fbm2(u*1.7+17,v*1.7+31,3)-0.52)*2.6,0,1);
     const vein=clamp((fbm2(u*3.4+5,v*3.4+9,2)-0.60)*2.8,0,1);
-    let l=0.40+(h-0.5)*0.50-cr*0.16;      // 凹槽压暗
+    let l=0.46+(h-0.5)*0.50-cr*0.16;      // 凹槽压暗（基线 0.46，别让崖面压成死黑）
     l*=1.0-vein*0.14;
     l=clamp(l,0.06,0.94);
     const k=(y*size+x)*4;

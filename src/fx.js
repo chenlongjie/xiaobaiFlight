@@ -44,22 +44,24 @@ export function buildFX(scene){
   lines.renderOrder=5;
   scene.add(lines);
 
-  // —— 花瓣：跟随相机的一小团粒子，随风飘、向后掠 ——
-  const P=240;
+  // —— 花瓣：跟随相机的一大团粒子，随风飘、向后掠。
+  //    参考片里花瓣漫天，密度按 800 起（Points 是纯 GPU 开销）。
+  //    尺寸压小以免近景花瓣盖过画面主体 ——
+  const P=800;
   const pgeo=new THREE.BufferGeometry();
   const ppos=new Float32Array(P*3);
   const pvel=[];
   for(let i=0;i<P;i++){
-    ppos[i*3]  =(Math.random()-0.5)*70;
-    ppos[i*3+1]=(Math.random()-0.2)*30;
-    ppos[i*3+2]=(Math.random()-0.5)*70;
+    ppos[i*3]  =(Math.random()-0.5)*72;
+    ppos[i*3+1]=(Math.random()-0.5)*44;
+    ppos[i*3+2]=(Math.random()-0.5)*72+30;   // 初始向镜头前方偏置，飞行时自然往后掠
     pvel.push({vx:(Math.random()-0.5)*1.6,vy:-0.3-Math.random()*0.9,vz:(Math.random()-0.5)*1.6,ph:Math.random()*6.28});
   }
   pgeo.setAttribute('position',new THREE.BufferAttribute(ppos,3));
   const pmat=new THREE.PointsMaterial({
-    map:petalTexture(),size:0.55,sizeAttenuation:true,
+    map:petalTexture(),size:0.22,sizeAttenuation:true,
     transparent:true,opacity:0,depthWrite:false,
-    color:0xffd2e0,
+    color:0xffd0e6,
   });
   const petals=new THREE.Points(pgeo,pmat);
   petals.frustumCulled=false;
@@ -121,10 +123,10 @@ export function buildFX(scene){
         const dy=ppos[k+1]-camera.position.y;
         const dz=ppos[k+2]-camera.position.z;
         const d2=dx*dx+dy*dy+dz*dz;
-        if(d2>70*70){
-          ppos[k]  =camera.position.x+(Math.random()-0.5)*60;
-          ppos[k+1]=camera.position.y+(Math.random()-0.3)*24;
-          ppos[k+2]=camera.position.z+(Math.random()-0.5)*60;
+        if(d2>72*72){
+          ppos[k]  =camera.position.x+(Math.random()-0.5)*68;
+          ppos[k+1]=camera.position.y+(Math.random()-0.5)*40;
+          ppos[k+2]=camera.position.z+(Math.random()-0.5)*68;
         }
       }
       pgeo.attributes.position.needsUpdate=true;

@@ -107,8 +107,8 @@ export class Post{
       vertexShader:vert,fragmentShader:compFrag,depthTest:false,depthWrite:false,
       uniforms:{
         tScene:{value:null},tBloom:{value:null},
-        uExposure:{value:1.0},uBloomK:{value:0.55},
-        uSat:{value:1.06},uContrast:{value:1.04},
+        uExposure:{value:1.24},uBloomK:{value:0.42},
+        uSat:{value:1.08},uContrast:{value:1.03},
         uVignette:{value:0.36},uGrain:{value:0.018},
         uTime:{value:0},uAberr:{value:0.0035},
       },

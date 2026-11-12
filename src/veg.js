@@ -5,7 +5,7 @@
 // 远看是一片有层次的绿毯，近看有叶簇剪影，这比假树可信得多。
 import * as THREE from 'three';
 import {WATER_Y,WORLD} from './terrain.js';
-import {fbm3,rng} from './util.js';
+import {fbm3,rng,clamp} from './util.js';
 import {applyFog} from './fog.js';
 
 // 两片互相垂直的 quad，原点在底部中心
@@ -74,7 +74,7 @@ function windMaterial(map,{alphaTest=0.38,bend=0.30,bendZ=0.22,gust=0.28,roughne
   return m;
 }
 
-export function buildVegetation({grassTex,bushTex,field,counts={grass:26000,bushes:6000},seed=17}){
+export function buildVegetation({grassTex,bushTex,flowerTex,field,counts={grass:26000,bushes:6000,flowers:0},seed=17}){
   const r=rng(seed);
   const group=new THREE.Group();
   const HALF=WORLD/2;
@@ -83,6 +83,8 @@ export function buildVegetation({grassTex,bushTex,field,counts={grass:26000,bush
 
   // —— 成片掩码：让植被有疏密，不是均匀撒盐 ——
   const patch=(x,z)=>fbm3(x*0.006,z*0.006,2.7,3);
+  // —— 大尺度"花区"：有的片区整片开花（花海），有的片区基本没花 ——
+  const flowerZone=(x,z)=>clamp(fbm3(x*0.0031+7.7,z*0.0031-2.9,2.1,3)*1.5-0.2,0,1);
 
   const grassSpots=[],bushSpots=[];
   let guard=0;
@@ -123,9 +125,9 @@ export function buildVegetation({grassTex,bushTex,field,counts={grass:26000,bush
     dummy.scale.set(s*r.range(0.9,1.3),s*1.45,s*r.range(0.9,1.3));
     dummy.updateMatrix();
     grass.setMatrixAt(i,dummy.matrix);
-    // 实例色只做"接近白"的细微变化：贴图本身已经有颜色，
-    // 这里再给高饱和就会叠成荧光绿（上一版的问题）
-    c.setHSL(r.range(0.16,0.34),r.range(0.03,0.14),r.range(0.60,0.94));
+    // 实例色在贴图基础上做明暗/色温变化：受光面偏黄绿亮、背光面偏冷暗。
+    // 饱和度放到 18~50%，贴图已有颜色，太高会叠成荧光绿
+    c.setHSL(r.range(0.16,0.30),r.range(0.18,0.50),r.range(0.55,0.95));
     grass.setColorAt(i,c);
   });
   grass.instanceMatrix.needsUpdate=true;
@@ -152,14 +154,56 @@ export function buildVegetation({grassTex,bushTex,field,counts={grass:26000,bush
   if(bushes.instanceColor)bushes.instanceColor.needsUpdate=true;
   group.add(bushes);
 
+  // —— 花丛（第三层）：参考片主体是粉紫花海。
+  //     flowerZone 划出大块开花区，缓坡河谷/台地最盛，崖壁与河床干净 ——
+  const flowersN=counts.flowers||0;
+  const flowerSpots=[];
+  guard=0;
+  while(flowerSpots.length<flowersN&&guard++<flowersN*36){
+    const x=r.range(-HALF,HALF),z=r.range(-HALF,HALF);
+    const y=field.heightAt(x,z);
+    if(y<WATER_Y+1.3||y>112)continue;
+    if(field.slopeAt(x,z)>0.56)continue;
+    const zone=flowerZone(x,z);
+    if(zone<0.03)continue;                       // 有些片区干脆不开花
+    const p=patch(x,z);
+    // zone 主导成片：zone 强的区域通过率接近 7 成，弱区基本淘汰 → 视觉上是花海不是撒盐
+    if(r.next()>0.06+zone*0.42+p*0.12)continue;
+    const alt=clamp(1-(y-40)*0.012,0.5,1);       // 高处花稀一些
+    if(r.next()>alt)continue;
+    flowerSpots.push([x,y,z,r.range(1.8,3.6)]);
+  }
+  const flowerGeo=crossCard();
+  const flowerMat=windMaterial(flowerTex,{alphaTest:0.28,bend:0.20,bendZ:0.14,gust:0.30,roughness:0.82,cacheKey:'windFlower'});
+  const flowers=new THREE.InstancedMesh(flowerGeo,flowerMat,flowerSpots.length);
+  flowers.name='flowers';
+  flowers.frustumCulled=false;
+  flowers.castShadow=false;flowers.receiveShadow=true;
+  flowerSpots.forEach(([x,y,z,s],i)=>{
+    dummy.position.set(x,y-0.05,z);
+    dummy.rotation.set(0,r.range(0,6.283),0);
+    // 横向铺开的花丛：宽 s、高只有 0.55~0.8s，趴在地面上，远看是一小片色块
+    dummy.scale.set(s,s*r.range(0.55,0.80),s);
+    dummy.updateMatrix();
+    flowers.setMatrixAt(i,dummy.matrix);
+    // 色相锁在紫~粉之间，只做明暗与饱和变化
+    c.setHSL(r.range(0.86,0.98),r.range(0.30,0.62),r.range(0.55,0.95));
+    flowers.setColorAt(i,c);
+  });
+  flowers.instanceMatrix.needsUpdate=true;
+  if(flowers.instanceColor)flowers.instanceColor.needsUpdate=true;
+  group.add(flowers);
+
   return {
     group,
     grassCount:grassSpots.length,
     bushCount:bushSpots.length,
+    flowerCount:flowerSpots.length,
     treeCount:0,
     update(t){
       grassMat.userData.uTime.value=t;
       bushMat.userData.uTime.value=t;
+      if(flowersN>0)flowerMat.userData.uTime.value=t;
     },
   };
 }
