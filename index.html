@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flight Real · 写实峡谷飞行</title>
+<style>
+  :root{color-scheme:dark}
+  html,body{margin:0;height:100%;background:#0b1014;overflow:hidden;font-family:system-ui,-apple-system,"PingFang SC",sans-serif}
+  #view{display:block;width:100%;height:100%}
+  .hud{position:fixed;left:18px;top:16px;color:#e8eef2;font-size:12px;line-height:1.7;
+       letter-spacing:.02em;text-shadow:0 1px 6px rgba(0,0,0,.75);pointer-events:none;opacity:.9}
+  .hud b{font-weight:600;color:#fff}
+  .hud .k{display:inline-block;min-width:62px;color:#9fb3c2}
+  #speed{position:fixed;right:20px;bottom:18px;color:#eaf2f7;font-size:13px;letter-spacing:.08em;
+     text-shadow:0 1px 8px rgba(0,0,0,.8);pointer-events:none;font-variant-numeric:tabular-nums;opacity:.85}
+  #loading{position:fixed;inset:0;display:grid;place-items:center;background:#0b1014;color:#7f97a8;
+     font-size:13px;letter-spacing:.14em;transition:opacity .5s;z-index:9}
+  #loading.gone{opacity:0;pointer-events:none}
+  #err{position:fixed;left:0;right:0;bottom:0;max-height:40%;overflow:auto;background:#2a0d0d;
+     color:#ffb4b4;font:11px/1.5 ui-monospace,monospace;padding:8px 12px;display:none;white-space:pre-wrap;z-index:99}
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div class="hud">
+  <div><span class="k">A / D</span>压坡度转向</div>
+  <div><span class="k">W / S</span>爬升 / 俯冲</div>
+  <div><span class="k">Shift</span>加速</div>
+  <div><span class="k">Space</span>收风 / 下潜</div>
+</div>
+<div id="speed">0 km/h</div>
+<div id="loading">正在生成峡谷…</div>
+<div id="err"></div>
+
+<script type="importmap">
+{"imports":{"three":"./vendor/three.module.js","three/webgpu":"./vendor/three.module.js"}}
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
