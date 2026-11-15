@@ -1,0 +1,8 @@
+node_modules/
+dist/
+shots/
+*.log
+.DS_Store
+.codefree/
+.codefree-mem/
+wuxia-3d-fight/
