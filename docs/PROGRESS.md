@@ -77,7 +77,24 @@ bash deploy.sh   # 仓库根执行即可
 - 网络走本机 `127.0.0.1:7897` 代理（可用 `NETLIFY_PROXY=` 覆盖），站点 ID `576984e3-5331-494f-a85e-861be6e20798`；
 - 打包必须排除 `wuxia-3d-fight/`（181M 无关截图素材），脚本已内置排除。
 
-部署后验证：页面出现「拖拽 悬停时环视」HUD、`src/net.js` 200 且含 `class Net`、`src/main.js` 293 行（联机版）。上线形态：页面静态（Netlify）+ 中继单独跑 `node server/server.mjs 8791`，页面加 `?ws=ws://中继地址` 开启联机。
+部署后验证：页面出现「拖拽 悬停时环视」HUD、`src/net.js` 200 且含 `class Net`、`src/main.js` 293 行（联机版）。上线形态：页面静态（Netlify）+ 中继单独跑 `node server/server.mjs 8791`，页面加 `?ws=` 开启联机。
+
+**部署后如何联机（关键）**：
+
+- 原理：线上页面默认单机。`src/main.js` 的 `wsUrl()`：本机（`localhost`/`127.0.0.1`）自动默认 `ws://主机:8791`；其他域名必须显式加 `?ws=地址`。
+- **重要坑：线上页面是 https（Netlify），浏览器禁止 https 页面连接 `ws://`（混合内容），必须用 `wss://`。** 因此：
+
+| 方案 | 做法 | 联机链接 |
+|---|---|---|
+| 云服务器（最稳） | `node server/server.mjs 8791` + Nginx 反代 WebSocket 并终结 TLS | `?ws=wss://你的域名` |
+| 本地 + Cloudflare 隧道（零成本） | 安装 cloudflared，`cloudflared tunnel --url ws://localhost:8791`，得到临时 `https://xxx.trycloudflare.com` | `?ws=wss://xxx.trycloudflare.com` |
+| 局域网自测 | 本机/局域网 http 打开时可用 | `?ws=ws://192.168.x.x:8791` |
+
+- 游玩链接示例（发给朋友一起玩）：
+  ```
+  https://xiaobai-flight.netlify.app/?ws=wss://中继地址&name=小花
+  ```
+  世界为确定性生成（所有客户端看到同一世界），中继只转发位置/姿态/速度，HUD 显示「· 在线 N 人」。
 
 ## 五、代码结构
 
