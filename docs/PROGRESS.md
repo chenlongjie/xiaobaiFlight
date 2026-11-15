@@ -1,7 +1,7 @@
 # 《小白乱飞》flight-real — 工作进展与后期展望
 
 > 更新时间：2026-11-15 ｜ 分支：main（远端 `github.com/chenlongjie/xiaobaiFlight`）
-> 状态：本地联机功能全部完成并验证，服务已停止，代码已推送到远端仓库。
+> 状态：本地联机功能全部完成并验证，服务已停止，代码已推送到远端仓库；**已部署上线 Netlify（`1fa6454`）**，https://xiaobai-flight.netlify.app/ 为最新联机版。
 
 ---
 
@@ -65,6 +65,20 @@ node server/smoke-test.mjs
 
 上线：**仓库根**部署到 Netlify（入口 `index.html`）；中继单独跑一台 Node（`server/server.mjs`），前端通过 `?ws=ws://中继地址` 开启联机。
 
+**一键部署（已沉淀为 `deploy.sh`）：**
+
+```bash
+bash deploy.sh   # 仓库根执行即可
+```
+
+要点（避免再碰壁）：
+- 凭据 = `~/Downloads/cookies.txt` 里的浏览器会话 `_nf-auth`（`nfu_...`，脚本自动提取）。**不是** PAT（SSO 账号 PAT 权限受限），**不是** netlify CLI（`clj63356966@gmail.com` 登录账号与站点 Owner `KAO` 非同一账号，无权管理该站点）；
+- `_nf-auth` 会随浏览器会话过期，失效时用 Owner 账号重新登录并从浏览器导出 cookies；
+- 网络走本机 `127.0.0.1:7897` 代理（可用 `NETLIFY_PROXY=` 覆盖），站点 ID `576984e3-5331-494f-a85e-861be6e20798`；
+- 打包必须排除 `wuxia-3d-fight/`（181M 无关截图素材），脚本已内置排除。
+
+部署后验证：页面出现「拖拽 悬停时环视」HUD、`src/net.js` 200 且含 `class Net`、`src/main.js` 293 行（联机版）。上线形态：页面静态（Netlify）+ 中继单独跑 `node server/server.mjs 8791`，页面加 `?ws=ws://中继地址` 开启联机。
+
 ## 五、代码结构
 
 ```
@@ -84,7 +98,7 @@ node server/smoke-test.mjs
 ## 六、后期展望（Roadmap）
 
 ### 近期（性价比最高）
-1. **部署落地**：写一份 Netlify + 中继的部署脚本/说明（含 `?ws=` 默认地址配置），真正跑起来让朋友能一起玩。
+1. ~~**部署落地**~~ ✅ 已完成：`deploy.sh` 一键生产部署（见上文"一键部署"），线上 https://xiaobai-flight.netlify.app/ 已运行 `1fa6454`；后续可补 `?ws=` 默认地址配置/部署说明页。
 2. **断线重连体验**：重连后若同 id 先发 `claim`，把旧连接顶掉（防攒幽灵连接）；HUD 增加"最后存活提示/RTT 显示"。
 3. **移动端触控**：虚拟摇杆 + 双指拖拽环视（现有 pointer 逻辑已兼容触摸，补 UI 层）。
 
